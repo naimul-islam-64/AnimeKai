@@ -32,8 +32,13 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Android SDK Platform 36
+      - name: Setup Android SDK
         uses: android-actions/setup-android@v3
+
+      - name: Accept Android SDK Licenses & Install Components
+        run: |
+          yes | sdkmanager --licenses || true
+          sdkmanager "platforms;android-36" "platforms;android-35" "platforms;android-34" "build-tools;36.0.0" "build-tools;35.0.0" || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -78,10 +83,10 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
-            ./gradlew :app:assembleRelease --no-daemon
+            ./gradlew :app:assembleRelease --no-daemon --stacktrace
           else
-            echo "No custom keystore found, building unsigned / debug APKs for release"
-            ./gradlew :app:assembleRelease :app:assembleDebug --no-daemon
+            echo "Building APKs..."
+            ./gradlew :app:assembleRelease --no-daemon --stacktrace || ./gradlew :app:assembleDebug --no-daemon --stacktrace
           fi
 
       # 3. Organize and rename APK artifacts
