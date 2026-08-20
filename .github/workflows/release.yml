@@ -1,0 +1,140 @@
+name: Build & Release AnimeKai APKs
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version_tag:
+        description: 'Release version tag (e.g. v1.0.0)'
+        required: false
+        default: 'v1.0.0'
+
+jobs:
+  build-and-release:
+    name: Build & Publish Multi-Arch APKs
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant Execute Permission to Gradle
+        run: chmod +x gradlew || true
+
+      - name: Setup Android SDK Platform 36
+        uses: android-actions/setup-android@v3
+
+      # Keystore setup for signed builds (falls back gracefully to unsigned/debug if secrets not set)
+      - name: Decode Release Keystore (if provided)
+        id: keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > "${{ github.workspace }}/my-upload-key.jks"
+            echo "has_keystore=true" >> $GITHUB_OUTPUT
+            echo "KEYSTORE_PATH=${{ github.workspace }}/my-upload-key.jks" >> $GITHUB_ENV
+          else
+            echo "has_keystore=false" >> $GITHUB_OUTPUT
+          fi
+
+      # 1. Run Automated JVM Unit Tests
+      - name: Run Unit Tests & AdBlocker Verifications
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+
+      # 2. Build Release APKs
+      - name: Build Release APKs
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
+            ./gradlew :app:assembleRelease --no-daemon
+          else
+            echo "No custom keystore found, building unsigned / debug APKs for release"
+            ./gradlew :app:assembleRelease :app:assembleDebug --no-daemon
+          fi
+
+      # 3. Organize and rename APK artifacts
+      - name: Prepare APK Release Artifacts
+        id: prepare_apks
+        run: |
+          mkdir -p release-apks
+          VERSION_NAME="${{ github.ref_name }}"
+          if [ -z "$VERSION_NAME" ] || [ "$VERSION_NAME" = "main" ]; then
+            VERSION_NAME="${{ github.event.inputs.version_tag }}"
+          fi
+
+          echo "Packaging APKs for version: $VERSION_NAME"
+
+          # Locate generated APKs in build directory
+          find app/build/outputs/apk/ -name "*.apk" -type f | while read -r apk_file; do
+            filename=$(basename "$apk_file")
+            echo "Found APK: $apk_file ($filename)"
+            
+            if [[ "$filename" == *"arm64"* ]]; then
+              cp "$apk_file" "release-apks/AnimeKai-${VERSION_NAME}-arm64-v8a.apk"
+            elif [[ "$filename" == *"armeabi"* || "$filename" == *"armv7"* ]]; then
+              cp "$apk_file" "release-apks/AnimeKai-${VERSION_NAME}-armeabi-v7a.apk"
+            elif [[ "$filename" == *"x86_64"* ]]; then
+              cp "$apk_file" "release-apks/AnimeKai-${VERSION_NAME}-x86_64.apk"
+            elif [[ "$filename" == *"x86"* ]]; then
+              cp "$apk_file" "release-apks/AnimeKai-${VERSION_NAME}-x86.apk"
+            elif [[ "$filename" == *"universal"* || "$filename" == *"release"* ]]; then
+              cp "$apk_file" "release-apks/AnimeKai-${VERSION_NAME}-universal.apk"
+            else
+              cp "$apk_file" "release-apks/AnimeKai-${VERSION_NAME}-${filename}"
+            fi
+          done
+
+          # If only universal apk was output by assembleRelease, ensure fallback name exists
+          if [ -f "app/build/outputs/apk/release/app-release.apk" ] && [ ! -f "release-apks/AnimeKai-${VERSION_NAME}-universal.apk" ]; then
+            cp "app/build/outputs/apk/release/app-release.apk" "release-apks/AnimeKai-${VERSION_NAME}-universal.apk"
+          fi
+          if [ -f "app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+            cp "app/build/outputs/apk/release/app-release-unsigned.apk" "release-apks/AnimeKai-${VERSION_NAME}-universal-unsigned.apk"
+          fi
+
+          ls -lah release-apks/
+
+      # 4. Publish Release to GitHub Releases with APKs
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch'
+        with:
+          tag_name: ${{ github.ref_name || github.event.inputs.version_tag }}
+          name: "AnimeKai ${{ github.ref_name || github.event.inputs.version_tag }}"
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+          files: |
+            release-apks/*.apk
+          body: |
+            ## 🌌 AnimeKai Official Release (${{ github.ref_name || github.event.inputs.version_tag }})
+
+            ### ✨ Highlights:
+            - **Ironclad AdShield & Anti-Redirect Engine**: Eliminates click-anywhere redirect traps, casino/betting popups, and fake alerts across all anime pages and streaming servers.
+            - **Fullscreen Video Player**: Native video player controls with full rotation support and system bar management.
+            - **Offline Vault**: Auto-saves up to 10 recently browsed anime pages for offline viewing.
+            - **Material Design 3**: OLED-friendly dark palette with dynamic theming.
+
+            ### 📱 Which APK should I install?
+            - **`AnimeKai-...-arm64-v8a.apk`**: Recommended for almost all modern Android phones & tablets (64-bit ARM).
+            - **`AnimeKai-...-armeabi-v7a.apk`**: For older 32-bit Android phones, older TV boxes, and budget devices.
+            - **`AnimeKai-...-x86_64.apk`**: For Chromebooks, PC Android emulators, and Intel-based Android devices.
+            - **`AnimeKai-...-universal.apk`**: Works across all supported Android architectures.

@@ -1,0 +1,48 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Outer Diamond Shield -->
+    <path
+        android:pathData="M54,20 L84,54 L54,88 L24,54 Z"
+        android:strokeWidth="3.5"
+        android:strokeColor="#FF2A85">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="24"
+                android:startY="20"
+                android:endX="84"
+                android:endY="88"
+                android:type="linear">
+                <item android:color="#33FF007F" android:offset="0.0" />
+                <item android:color="#229D00FF" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Inner Stylized Anime Kai Play Shard -->
+    <path
+        android:pathData="M46,38 L72,54 L46,70 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="46"
+                android:startY="38"
+                android:endX="72"
+                android:endY="70"
+                android:type="linear">
+                <item android:color="#00F0FF" android:offset="0.0" />
+                <item android:color="#FF007A" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <!-- Anime Katana Slash Accent -->
+    <path
+        android:pathData="M32,28 L76,80"
+        android:strokeWidth="2.5"
+        android:strokeColor="#FFFFFF" />
+    <path
+        android:pathData="M70,30 L80,24"
+        android:strokeWidth="2.0"
+        android:strokeColor="#00F0FF" />
+</vector>

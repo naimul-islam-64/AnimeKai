@@ -1,0 +1,6 @@
+{
+  "name": "AnimeKai",
+  "description": "Premium anime streaming browser with ad blocker, offline page cache, dark/light theme, and responsive design.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
