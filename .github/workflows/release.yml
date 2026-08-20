@@ -56,9 +56,17 @@ jobs:
             echo "has_keystore=false" >> $GITHUB_OUTPUT
           fi
 
+      # Prepare debug keystore and local test prerequisites
+      - name: Ensure Debug Keystore Exists
+        run: |
+          if [ ! -f "debug.keystore" ] && [ -f "debug.keystore.base64" ]; then
+            echo "Restoring debug.keystore from base64"
+            base64 --decode debug.keystore.base64 > debug.keystore
+          fi
+
       # 1. Run Automated JVM Unit Tests
       - name: Run Unit Tests & AdBlocker Verifications
-        run: ./gradlew :app:testDebugUnitTest --no-daemon
+        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace
 
       # 2. Build Release APKs
       - name: Build Release APKs
