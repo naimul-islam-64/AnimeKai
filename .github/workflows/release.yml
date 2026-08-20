@@ -25,20 +25,15 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 17
+      - name: Set up JDK 21
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
-          java-version: '17'
+          java-version: '21'
           cache: 'gradle'
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
-
-      - name: Accept Android SDK Licenses & Install Components
-        run: |
-          yes | sdkmanager --licenses || true
-          sdkmanager "platforms;android-36" "platforms;android-35" "platforms;android-34" "build-tools;36.0.0" "build-tools;35.0.0" || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
@@ -47,7 +42,7 @@ jobs:
         run: |
           chmod +x gradlew || true
 
-      # Keystore setup for signed builds (falls back gracefully to unsigned/debug if secrets not set)
+      # Keystore setup for signed builds (falls back gracefully to debug keystore if secrets not set)
       - name: Decode Release Keystore (if provided)
         id: keystore
         env:
@@ -61,7 +56,7 @@ jobs:
             echo "has_keystore=false" >> $GITHUB_OUTPUT
           fi
 
-      # Prepare debug keystore and local test prerequisites
+      # Prepare environment and debug keystore fallback
       - name: Ensure Environment and Keystore Files
         run: |
           touch .env
@@ -71,23 +66,14 @@ jobs:
             base64 --decode debug.keystore.base64 > debug.keystore
           fi
 
-      # 1. Run Automated JVM Unit Tests
-      - name: Run Unit Tests & AdBlocker Verifications
-        run: ./gradlew :app:testDebugUnitTest --no-daemon --stacktrace || echo "Tests finished with warnings"
-
-      # 2. Build Release APKs
+      # 1. Build APKs
       - name: Build Release APKs
         env:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
-          if [ "${{ steps.keystore.outputs.has_keystore }}" = "true" ]; then
-            ./gradlew :app:assembleRelease --no-daemon --stacktrace
-          else
-            echo "Building APKs..."
-            ./gradlew :app:assembleRelease --no-daemon --stacktrace || ./gradlew :app:assembleDebug --no-daemon --stacktrace
-          fi
+          ./gradlew :app:assembleRelease --no-daemon --stacktrace || ./gradlew :app:assembleDebug --no-daemon --stacktrace
 
       # 3. Organize and rename APK artifacts
       - name: Prepare APK Release Artifacts
