@@ -32,11 +32,15 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Grant Execute Permission to Gradle
-        run: chmod +x gradlew || true
-
       - name: Setup Android SDK Platform 36
         uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Prepare Gradle Executable
+        run: |
+          chmod +x gradlew || true
 
       # Keystore setup for signed builds (falls back gracefully to unsigned/debug if secrets not set)
       - name: Decode Release Keystore (if provided)
